@@ -7,6 +7,7 @@ from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
+from email.mime.image import MIMEImage
 from email import encoders
 from pathlib import Path
 from dotenv import load_dotenv
@@ -139,37 +140,54 @@ def send_email_notification(record, uploaded_files=None):
         msg["From"] = f"आपले दादा जनसंपर्क पोर्टल <{user}>"
         msg["To"] = receiver
 
+        # Attach Vaibhav Dada photo inline for the email header
+        dada_photo_path = Path(__file__).parent / "dada.jpg"
+        if dada_photo_path.exists():
+            try:
+                with open(dada_photo_path, "rb") as df:
+                    img_mime = MIMEImage(df.read())
+                    img_mime.add_header("Content-ID", "<dada_photo>")
+                    img_mime.add_header("Content-Disposition", "inline; filename=dada.jpg")
+                    msg.attach(img_mime)
+            except Exception as err:
+                print("Could not attach dada_photo:", err)
+
         whatsapp_tag = "🟢 WhatsApp उपलब्ध" if record.get('whatsapp_opt_in') else ""
 
         html_body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:20px; color:#1e293b;">
-          <div style="max-width:620px; margin:auto; background:#fff; border-radius:14px; border:1px solid #e2e8f0; overflow:hidden;">
-            <div style="background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; padding:20px; text-align:center;">
-              <h2 style="margin:0; font-size:22px;">🏛️ आपले दादा जनसंपर्क कक्ष</h2>
-              <p style="margin:4px 0 0; font-size:13px;">विटा–खानापूर विधानसभा मतदारसंघ</p>
-              <div style="display:inline-block; background:#fff; color:#ea580c; font-weight:bold; padding:4px 12px; border-radius:999px; margin-top:10px; font-size:13px;">
+          <div style="max-width:620px; margin:auto; background:#fff; border-radius:16px; border:1px solid #e2e8f0; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,0.06);">
+            <div style="background:linear-gradient(135deg,#f97316,#ea580c); color:#fff; padding:24px 20px; text-align:center;">
+              <div style="margin-bottom:10px;">
+                <img src="cid:dada_photo" onerror="this.src='https://raw.githubusercontent.com/parthps008/aaple-dada/main/dada.jpg'" 
+                     alt="मा. श्री. वैभव दादा" 
+                     style="width:90px; height:90px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 6px 16px rgba(0,0,0,0.22); object-fit:cover; display:inline-block;" />
+              </div>
+              <h2 style="margin:0; font-size:23px; font-weight:800;">मा. श्री. वैभव (दादा) जनसंपर्क कक्ष</h2>
+              <p style="margin:4px 0 0; font-size:13px; opacity:0.95;">विटा–खानापूर विधानसभा मतदारसंघ • तक्रार निवारण विभाग</p>
+              <div style="display:inline-block; background:#fff; color:#ea580c; font-weight:bold; padding:5px 14px; border-radius:999px; margin-top:12px; font-size:13px;">
                 तक्रार क्रमांक: {record['id']}
               </div>
             </div>
-            <div style="padding:22px;">
-              <h3 style="margin-top:0; border-bottom:2px solid #f97316; padding-bottom:6px; color:#0f172a;">📋 तक्रारदार व समस्येचा तपशील</h3>
+            <div style="padding:24px;">
+              <h3 style="margin-top:0; border-bottom:2px solid #f97316; padding-bottom:8px; color:#0f172a;">📋 तक्रारदार व समस्येचा तपशील</h3>
               <table style="width:100%; border-collapse:collapse; font-size:14px; margin-top:10px;">
-                <tr><td style="padding:8px 6px; font-weight:bold; width:35%;">नागरिकाचे नाव:</td><td>{record['name']}</td></tr>
-                <tr><td style="padding:8px 6px; font-weight:bold;">मोबाईल नंबर:</td><td><a href="tel:{record['mobile']}">{record['mobile']}</a> {whatsapp_tag}</td></tr>
-                <tr><td style="padding:8px 6px; font-weight:bold;">समस्येचा प्रकार:</td><td style="color:#ea580c; font-weight:bold;">{record['category']}</td></tr>
-                <tr><td style="padding:8px 6px; font-weight:bold;">गाव / शहर:</td><td>{record['village']} (ता. {record['taluka']})</td></tr>
-                <tr><td style="padding:8px 6px; font-weight:bold;">प्रभाग / परिसर:</td><td>{record.get('area', 'परिसर')}</td></tr>
+                <tr><td style="padding:9px 6px; font-weight:bold; width:35%;">नागरिकाचे नाव:</td><td><strong>{record['name']}</strong></td></tr>
+                <tr><td style="padding:9px 6px; font-weight:bold;">मोबाईल नंबर:</td><td><a href="tel:{record['mobile']}" style="color:#0f172a;font-weight:bold;">{record['mobile']}</a> {whatsapp_tag}</td></tr>
+                <tr><td style="padding:9px 6px; font-weight:bold;">समस्येचा प्रकार:</td><td><span style="color:#ea580c; font-weight:bold;">{record['category']}</span></td></tr>
+                <tr><td style="padding:9px 6px; font-weight:bold;">गाव / शहर:</td><td><strong>{record['village']}</strong> (ता. {record['taluka']})</td></tr>
+                <tr><td style="padding:9px 6px; font-weight:bold;">प्रभाग / परिसर:</td><td>{record.get('area', 'परिसर')}</td></tr>
               </table>
 
               <div style="margin-top:18px;">
-                <strong>📝 समस्येचे वर्णन:</strong>
-                <div style="background:#fffaf5; border:1px solid #fed7aa; border-radius:10px; padding:12px; margin-top:6px; font-size:14px; line-height:1.5;">
+                <strong>📝 समस्येचे सविस्तर वर्णन:</strong>
+                <div style="background:#fffaf5; border:1px solid #fed7aa; border-radius:10px; padding:14px; margin-top:6px; font-size:14px; line-height:1.6; color:#334155;">
                   {record['description']}
                 </div>
               </div>
             </div>
-            <div style="background:#0f172a; color:#94a3b8; padding:14px; text-align:center; font-size:12px;">
+            <div style="background:#0f172a; color:#94a3b8; padding:16px; text-align:center; font-size:12px;">
               © २०२६ आपले दादा जनसंपर्क कक्ष • विटा–खानापूर<br>
               सूचना ईमेल: {receiver}
             </div>
@@ -308,10 +326,11 @@ st.markdown("---")
 # ----------------------------------------------------
 # 6. Main Navigation Tabs
 # ----------------------------------------------------
-tab_complaint, tab_track, tab_works, tab_contact = st.tabs([
+tab_complaint, tab_track, tab_works, tab_ai, tab_contact = st.tabs([
     "📝 नवीन तक्रार नोंदवा",
     "🔎 तक्रारीचा मागोवा (Track)",
     "🏆 मार्गी लागलेली कामे",
+    "🤖 AI नागरिक सहाय्यक",
     "🏢 जनसंपर्क कार्यालय व माहिती"
 ])
 
@@ -507,7 +526,69 @@ with tab_works:
         st.caption("नादुरुस्त मुख्य जलवाहिनी अवघ्या ४८ तासांत दुरुस्त करून गावातील पिण्याच्या पाण्याचा प्रश्न मार्गी लावला.")
 
 # ====================================================
-# TAB 4: जनसंपर्क कार्यालय संपर्क
+# TAB 4: AI नागरिक सहाय्यक (Chatbot)
+# ====================================================
+with tab_ai:
+    st.subheader("🤖 आपले दादा डिजिटल नागरिक सहाय्यक")
+    st.caption("विटा–खानापूर परिसरातील नागरिक समस्या, योजना व तक्रार प्रक्रियेबाबत २४×७ डिजिटल मार्गदर्शन.")
+
+    # Quick prompt buttons
+    st.markdown("**💡 वारंवार विचारले जाणारे प्रश्न (क्लिक करा):**")
+    q_col1, q_col2, q_col3, q_col4 = st.columns(4)
+    with q_col1:
+        if st.button("🛣️ रस्त्याची तक्रार कशी करावी?"):
+            st.session_state["ai_query"] = "रस्त्यावरील खड्ड्यांची किंवा डांबरीकरणाची तक्रार कशी करावी?"
+    with q_col2:
+        if st.button("💧 पाणीपुरवठा समस्या"):
+            st.session_state["ai_query"] = "पाणीपुरवठा खंडित झाला असल्यास काय करावे?"
+    with q_col3:
+        if st.button("🔎 तक्रारीचा मागोवा कसा घ्यायचा?"):
+            st.session_state["ai_query"] = "तक्रारीचा मागोवा कसा घ्यायचा?"
+    with q_col4:
+        if st.button("📍 कार्यालयाचा पत्ता काय?"):
+            st.session_state["ai_query"] = "जनसंपर्क कार्यालयाचा पत्ता आणि वेळ काय आहे?"
+
+    # Chat history state
+    if "ai_messages" not in st.session_state:
+        st.session_state["ai_messages"] = [
+            {"role": "assistant", "content": "नमस्कार! 🙏 मी आपले दादा डिजिटल नागरिक सहाय्यक आहे. विटा-खानापूर परिसरातील रस्ते, पाणी, वीज, शेती किंवा तक्रार प्रक्रियेबद्दल आपला प्रश्न खाली विचारा."}
+        ]
+
+    for m in st.session_state["ai_messages"]:
+        with st.chat_message(m["role"]):
+            st.write(m["content"])
+
+    # Chat input
+    user_prompt = st.chat_input("तुमचा प्रश्न येथे विचारा...")
+    if "ai_query" in st.session_state and st.session_state["ai_query"]:
+        user_prompt = st.session_state.pop("ai_query")
+
+    if user_prompt:
+        st.session_state["ai_messages"].append({"role": "user", "content": user_prompt})
+        with st.chat_message("user"):
+            st.write(user_prompt)
+
+        # Smart Heuristic Response
+        lower_p = user_prompt.lower()
+        if "रस्त" in lower_p or "खड्ड" in lower_p:
+            reply = "रस्त्यावरील खड्डे किंवा डांबरीकरणाच्या तक्रारीसाठी वरील '📝 नवीन तक्रार नोंदवा' टॅबमध्ये जाऊन 'रस्ते व वाहतूक समस्या' निवडा. रस्त्याचे नाव व शक्य असल्यास फोटो अपलोड करा. सार्वजनिक बांधकाम विभाग व दादांच्या कार्यालयाकडून तत्काळ दखल घेतली जाईल."
+        elif "पाणी" in lower_p or "नळ" in lower_p or "पाईप" in lower_p:
+            reply = "पाणीपुरवठा किंवा जलवाहिनी गळतीची समस्या असल्यास फॉर्ममध्ये 'पाणीपुरवठा व जलवाहिनी' निवडा. आपत्कालीन टँकर किंवा व्हॉल्व्ह दुरुस्तीसाठी जनसंपर्क कार्यालयाची टीम संबंधित ग्रामपंचायतीशी समन्वय साधून काम तातडीने मार्गी लावेल."
+        elif "मागोवा" in lower_p or "ट्रॅक" in lower_p or "नंबर" in lower_p:
+            reply = "तक्रार नोंदवल्यावर मिळालेला APD-2026-XXXXXX हा क्रमांक वरील '🔎 तक्रारीचा मागोवा' टॅबमध्ये टाका. तिथे तुम्हाला १ ते ४ पायऱ्यांमध्ये कामाची सद्यस्थिती आणि अधिकाऱ्यांची नोंद दिसेल."
+        elif "पत्ता" in lower_p or "वेळ" in lower_p or "कार्यालय" in lower_p:
+            reply = "मा. श्री. वैभव दादा मुख्य जनसंपर्क कार्यालय: शिवाजी चौक, विटा, ता. खानापूर, जि. सांगली. कार्यालयीन वेळ: दररोज सकाळी ९:०० ते सायं. ७:००. दूरध्वनी: ०२३४७-२७२०००."
+        elif "वीज" in lower_p or "ट्रान्सफॉर्मर" in lower_p or "डीपी" in lower_p:
+            reply = "वीज खंडित होणे किंवा नवीन शेती ट्रान्सफॉर्मरसाठी फॉर्ममध्ये 'वीज, ट्रान्सफॉर्मर व पथदिवे' निवडा. महावितरणच्या (MSEDCL) कार्यकारी अभियंत्यांशी थेट पाठपुरावा केला जाईल."
+        else:
+            reply = f"धन्यवाद! आपला प्रश्न '{user_prompt}' नोंदवला आहे. विटा-खानापूर जनसंपर्क कार्यालय नागरिकांच्या सेवेसाठी सदैव तत्पर आहे. अधिक मदतीसाठी आपण वरील फॉर्मद्वारे थेट तक्रार दाखल करू शकता किंवा ०२३४७-२७२००० वर संपर्क साधू शकता."
+
+        st.session_state["ai_messages"].append({"role": "assistant", "content": reply})
+        with st.chat_message("assistant"):
+            st.write(reply)
+
+# ====================================================
+# TAB 5: जनसंपर्क कार्यालय संपर्क
 # ====================================================
 with tab_contact:
     st.subheader("🏢 जनसंपर्क कार्यालय पत्ता व थेट संपर्क")
