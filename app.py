@@ -61,21 +61,6 @@ def init_db():
     )
     """)
     conn.commit()
-
-    # Seed demo records if empty
-    cursor.execute("SELECT COUNT(*) FROM complaints")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("""
-        INSERT INTO complaints (id, name, mobile, village, taluka, area, category, description, whatsapp_opt_in, status, stage, remark, created_at)
-        VALUES 
-        ('APD-2026-102450', 'श्री. विजय पाटील', '9822******', 'विटा शहर', 'खानापूर', 'शिवाजी चौक', 'रस्ते व वाहतूक समस्या', 
-         'मुख्य रस्त्यावरील खड्डे बुजवून तातडीने डांबरीकरण करणेबाबत.', 1, 'प्रक्रियेत', 3, 
-         'सदर समस्येबाबत सार्वजनिक बांधकाम विभाग (PWD) चे उपअभियंता यांच्याशी संपर्क साधण्यात आला असून प्रत्यक्ष पाहणीसाठी टीम रवाना झाली आहे.', '02/10/2026'),
-        ('APD-2026-101180', 'श्री. मारुती माने', '9890******', 'भाळवणी', 'खानापूर', 'ग्रामपंचायत परिसर', 'पाणीपुरवठा जलवाहिनी दुरुस्ती', 
-         'मुख्य पाईपलाईन लिकेज दुरुस्ती करून नियमित पाणीपुरवठा सुरू करणे.', 1, 'पूर्ण', 4, 
-         'नवीन जलवाहिनी जोडणी व व्हॉल्व्ह दुरुस्तीचे काम पूर्ण झाले असून सुरळीत पाणीपुरवठा सुरू करण्यात आला आहे.', '28/09/2026')
-        """)
-        conn.commit()
     conn.close()
 
 init_db()
@@ -128,7 +113,7 @@ def get_complaint_stats():
     cursor.execute("SELECT COUNT(*) FROM complaints WHERE stage >= 4")
     resolved_db = cursor.fetchone()[0]
     conn.close()
-    return 1480 + total_db, 1220 + resolved_db
+    return total_db, resolved_db
 
 def to_marathi_num(num):
     m_map = {'0': '०', '1': '१', '2': '२', '3': '३', '4': '४', '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'}
@@ -383,9 +368,9 @@ with col_hero_left:
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown(f'<div class="stat-card"><div class="stat-number">{m_total}+</div><div style="font-size:12px;color:#64748b;font-weight:bold;">नोंदवलेल्या तक्रारी</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat-card"><div class="stat-number">{total_stat}</div><div style="font-size:12px;color:#64748b;font-weight:bold;">नोंदवलेल्या तक्रारी</div></div>', unsafe_allow_html=True)
     with c2:
-        st.markdown(f'<div class="stat-card"><div class="stat-number">{m_resolved}+</div><div style="font-size:12px;color:#64748b;font-weight:bold;">मार्गी लागलेली कामे</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat-card"><div class="stat-number">{resolved_stat}</div><div style="font-size:12px;color:#64748b;font-weight:bold;">मार्गी लागलेली कामे</div></div>', unsafe_allow_html=True)
     with c3:
         st.markdown('<div class="stat-card"><div class="stat-number">२४×७</div><div style="font-size:12px;color:#64748b;font-weight:bold;">डिजिटल सेवा</div></div>', unsafe_allow_html=True)
 
@@ -496,6 +481,7 @@ with tab_complaint:
             else:
                 st.warning(f"📧 **ईमेल स्थिती:** {email_msg}\n*(तक्रार डेटाबेसमध्ये सुरक्षित सेव्ह झाली आहे.)*")
 
+            st.session_state["track_input"] = complaint_id
             st.markdown(f"""
             > **महत्त्वाची नोंद:** कृपया हा तक्रार क्रमांक **`{complaint_id}`** जतन करून ठेवा.  
             > आपण वरील **'🔎 तक्रारीचा मागोवा'** टॅबमध्ये हा क्रमांक टाकून कामाची थेट प्रगती पाहू शकता.
@@ -508,17 +494,8 @@ with tab_track:
     st.subheader("🔎 तक्रारीची सद्यस्थिती तपासा")
     st.caption("आपला तक्रार क्रमांक टाकून कामाची प्रगती आणि अधिकाऱ्यांचा रिमार्क तपासा.")
 
-    # Demo Buttons
-    d_col1, d_col2 = st.columns([1, 1])
-    with d_col1:
-        if st.button("🔹 डेमो १: प्रक्रियेत असलेली तक्रार (रस्ते)"):
-            st.session_state["track_input"] = "APD-2026-102450"
-    with d_col2:
-        if st.button("🟢 डेमो २: पूर्ण झालेली तक्रार (पाणीपुरवठा)"):
-            st.session_state["track_input"] = "APD-2026-101180"
-
-    current_val = st.session_state.get("track_input", "APD-2026-102450")
-    track_query = st.text_input("तक्रार क्रमांक टाका:", value=current_val, placeholder="उदा. APD-2026-102450")
+    current_val = st.session_state.get("track_input", "")
+    track_query = st.text_input("तक्रार क्रमांक टाका:", value=current_val, placeholder="उदा. APD-2026-123456")
 
     if st.button("🔎 मागोवा तपासा", type="primary"):
         data = get_complaint_from_db(track_query)
