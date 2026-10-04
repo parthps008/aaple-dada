@@ -553,7 +553,8 @@ def call_groq_llm(chat_history, api_key, model="openai/gpt-oss-120b"):
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key.strip()}"
+        "Authorization": f"Bearer {api_key.strip()}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     groq_messages = [{"role": "system", "content": DADA_AI_SYSTEM_PROMPT}]
     for m in chat_history[-8:]:
