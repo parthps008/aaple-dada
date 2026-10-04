@@ -107,6 +107,34 @@ def get_complaint_from_db(complaint_id):
     conn.close()
     return dict(row) if row else None
 
+def mark_complaint_resolved(complaint_id):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE complaints 
+    SET status = 'पूर्ण', stage = 4, remark = 'मा. वैभव दादांच्या जनसंपर्क कार्यालयामार्फत पाठपुरावा करून सदर समस्येचे यशस्वी निवारण करण्यात आले आहे.'
+    WHERE UPPER(id) = UPPER(?)
+    """, (complaint_id.strip(),))
+    updated = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+def get_complaint_stats():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM complaints")
+    total_db = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM complaints WHERE stage >= 4")
+    resolved_db = cursor.fetchone()[0]
+    conn.close()
+    return 1480 + total_db, 1220 + resolved_db
+
+def to_marathi_num(num):
+    m_map = {'0': '०', '1': '१', '2': '२', '3': '३', '4': '४', '5': '५', '6': '६', '7': '७', '8': '८', '9': '९'}
+    formatted = f"{num:,}"
+    return "".join(m_map.get(ch, ch) for ch in formatted)
+
 # ----------------------------------------------------
 # 3. SMTP Email Configuration & Dispatcher
 # ----------------------------------------------------
@@ -156,6 +184,18 @@ def send_email_notification(record, uploaded_files=None):
 
         whatsapp_tag = "🟢 WhatsApp उपलब्ध" if record.get('whatsapp_opt_in') else ""
 
+        # Construct One-click Resolve URL
+        app_url = "https://aaple-dada.streamlit.app"
+        try:
+            if hasattr(st, "secrets") and len(st.secrets) > 0:
+                app_url = st.secrets.get("APP_URL", os.getenv("APP_URL", app_url))
+            else:
+                app_url = os.getenv("APP_URL", app_url)
+        except Exception:
+            pass
+        app_url = app_url.rstrip("/")
+        resolve_url = f"{app_url}/?resolve={record['id']}"
+
         html_body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; background:#f8fafc; padding:20px; color:#1e293b;">
@@ -187,6 +227,20 @@ def send_email_notification(record, uploaded_files=None):
                 <div style="background:#fffaf5; border:1px solid #fed7aa; border-radius:10px; padding:14px; margin-top:6px; font-size:14px; line-height:1.6; color:#334155;">
                   {record['description']}
                 </div>
+              </div>
+
+              <!-- Office Action Button: Mark as Resolved -->
+              <div style="background:#ecfdf5; border:2px dashed #10b981; border-radius:14px; padding:18px; text-align:center; margin-top:22px;">
+                <div style="font-size:15px; font-weight:bold; color:#065f46; margin-bottom:5px;">
+                  ⚡ जनसंपर्क कार्यालयीन कृती (Office Action)
+                </div>
+                <p style="font-size:12.5px; color:#047857; margin:0 0 14px; line-height:1.4;">
+                  नागरिकाची ही समस्या प्रत्यक्ष सोडवली गेल्यावर खालील बटणावर क्लिक करा. पोर्टलवरील 'मार्गी लागलेली कामे' चा आकडा आपोआप वाढेल!
+                </p>
+                <a href="{resolve_url}" 
+                   style="background:linear-gradient(135deg, #10b981, #059669); color:#ffffff; font-weight:bold; padding:12px 26px; border-radius:10px; text-decoration:none; display:inline-block; font-size:15px; box-shadow:0 4px 14px rgba(16,185,129,0.35);">
+                  ✅ ही तक्रार मार्गी लागली (Mark as Resolved)
+                </a>
               </div>
             </div>
             <div style="background:#0f172a; color:#94a3b8; padding:16px; text-align:center; font-size:12px;">
@@ -291,7 +345,26 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# 5. Header & Leader Presentation
+# 5. Check for One-Click Resolve Action from Email Link
+# ----------------------------------------------------
+params = st.query_params
+if "resolve" in params:
+    ticket_to_resolve = params.get("resolve")
+    if ticket_to_resolve:
+        success = mark_complaint_resolved(ticket_to_resolve)
+        if success:
+            st.balloons()
+            st.success(f"✓ तक्रार क्रमांक **{ticket_to_resolve}** यशस्वीरित्या 'मार्गी लागली' (काम पूर्ण झाले) म्हणून अद्ययावत करण्यात आली आहे! खालील आकडे लगेच अद्ययावत झाले आहेत.")
+        else:
+            st.warning(f"तक्रार क्रमांक {ticket_to_resolve} डेटाबेसमध्ये सापडला नाही.")
+
+# Dynamic Complaint & Resolution Stats
+total_stat, resolved_stat = get_complaint_stats()
+m_total = to_marathi_num(total_stat)
+m_resolved = to_marathi_num(resolved_stat)
+
+# ----------------------------------------------------
+# 6. Header & Leader Presentation
 # ----------------------------------------------------
 col_hero_left, col_hero_right = st.columns([1.6, 1.0], gap="medium")
 
@@ -310,9 +383,9 @@ with col_hero_left:
 
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown('<div class="stat-card"><div class="stat-number">१,४८०+</div><div style="font-size:12px;color:#64748b;font-weight:bold;">नोंदवलेल्या तक्रारी</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat-card"><div class="stat-number">{m_total}+</div><div style="font-size:12px;color:#64748b;font-weight:bold;">नोंदवलेल्या तक्रारी</div></div>', unsafe_allow_html=True)
     with c2:
-        st.markdown('<div class="stat-card"><div class="stat-number">१,२२०+</div><div style="font-size:12px;color:#64748b;font-weight:bold;">मार्गी लागलेली कामे</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="stat-card"><div class="stat-number">{m_resolved}+</div><div style="font-size:12px;color:#64748b;font-weight:bold;">मार्गी लागलेली कामे</div></div>', unsafe_allow_html=True)
     with c3:
         st.markdown('<div class="stat-card"><div class="stat-number">२४×७</div><div style="font-size:12px;color:#64748b;font-weight:bold;">डिजिटल सेवा</div></div>', unsafe_allow_html=True)
 
