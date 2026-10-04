@@ -9,8 +9,11 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 from pathlib import Path
+from dotenv import load_dotenv
 
 import streamlit as st
+
+load_dotenv()
 
 # Ensure UTF-8 console output
 if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
@@ -105,14 +108,22 @@ def get_complaint_from_db(complaint_id):
 # 3. SMTP Email Configuration & Dispatcher
 # ----------------------------------------------------
 def get_smtp_credentials():
-    # 1. Try Streamlit Cloud Secrets (st.secrets)
-    # 2. Try OS Environment variables
-    # 3. Fallback to default
-    smtp_host = st.secrets.get("SMTP_HOST", os.getenv("SMTP_HOST", "smtp.gmail.com"))
-    smtp_port = int(st.secrets.get("SMTP_PORT", os.getenv("SMTP_PORT", "587")))
-    smtp_user = st.secrets.get("SMTP_USER", os.getenv("SMTP_USER", ""))
-    smtp_pass = st.secrets.get("SMTP_PASSWORD", os.getenv("SMTP_PASSWORD", ""))
-    receiver = st.secrets.get("NOTIFICATION_RECEIVER", os.getenv("NOTIFICATION_RECEIVER", "sagareparth@gmail.com"))
+    smtp_host = "smtp.gmail.com"
+    smtp_port = 587
+    smtp_user = "sagareparth@gmail.com"
+    smtp_pass = os.getenv("SMTP_PASSWORD", "")
+    receiver = "sagareparth@gmail.com"
+
+    try:
+        if hasattr(st, "secrets") and len(st.secrets) > 0:
+            smtp_host = st.secrets.get("SMTP_HOST", smtp_host)
+            smtp_port = int(st.secrets.get("SMTP_PORT", smtp_port))
+            smtp_user = st.secrets.get("SMTP_USER", smtp_user)
+            smtp_pass = st.secrets.get("SMTP_PASSWORD", smtp_pass)
+            receiver = st.secrets.get("NOTIFICATION_RECEIVER", receiver)
+    except Exception:
+        pass
+
     return smtp_host, smtp_port, smtp_user, smtp_pass, receiver
 
 def send_email_notification(record, uploaded_files=None):
